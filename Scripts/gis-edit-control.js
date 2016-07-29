@@ -14,10 +14,7 @@
         helpTooltip.setPosition(evt.coordinate);
 
         helpTooltipElement.classList.remove('hidden');
-    };
-
-
-    
+    };   
     
 
     function createHelpTooltip(map) {
@@ -40,23 +37,90 @@
     $btnEdit.attr("title", "Choose control to start editing");
 
     var that = this;
+	
+	var createTextStyle = function(text){
+	var d=  new ol.style.Text({
+          textAlign: 'center',
+          textBaseline: 'alphabetic',
+          font: 'normal 20px Areal',
+          text: text,
+          fill: new ol.style.Fill({color: 'aa3300'}),
+          stroke: new ol.style.Stroke({color: '#ffffff', width: 1}),
+          offsetX: 0,
+          offsetY: 0,
+          rotation: 0
+        });
+		return d;
+	};
+	function polygonStyleFunction(fillColor,strokeColor,feature, resolution) {
+        return new ol.style.Style({
+          stroke: new ol.style.Stroke({
+            color: strokeColor?strokeColor:'blue',
+            width: 1
+          }),
+          fill: new ol.style.Fill({
+            color: fillColor?fillColor:'rgba(0, 0, 255, 0.1)'
+          }),
+          text: createTextStyle(feature.get('name'))
+        });
+      };
+	function lineStyleFunction(fillColor,strokeColor,feature, resolution) {
+        return new ol.style.Style({
+          stroke: new ol.style.Stroke({
+            color:  strokeColor?strokeColor:'green',
+            width: 2
+          }),
+          text: createTextStyle(feature.get('name'))
+        });
+      }
+
+      // Points
+      function pointStyleFunction(fillColor,strokeColor,feature, resolution) {
+        return new ol.style.Style({
+          image: new ol.style.Circle({
+            radius: 10,
+            fill:  fillColor?fillColor:new ol.style.Fill({color: 'blue'}),
+            stroke: strokeColor?strokeColor:new ol.style.Stroke({color: 'red', width: 1})
+          }),
+          text: createTextStyle(feature.get('name'))
+        });
+      }
+  
+	  
+	  
     var vector = new ol.layer.Vector({
         source: new ol.source.Vector(),
-        style: new ol.style.Style({
-            fill: new ol.style.Fill({
-                color: 'rgba(255, 255, 255, 0.2)'
-            }),
-            stroke: new ol.style.Stroke({
-                color: '#ffcc33',
-                width: 2
-            }),
-            image: new ol.style.Circle({
-                radius: 7,
-                fill: new ol.style.Fill({
-                    color: '#ffcc33'
-                })
-            })
-        })
+		style:function(feature, resolution) {
+                var name = feature.get('name');
+                var featType = feature.getGeometry().getType();               
+                if(name) {
+                    switch (featType) {
+                    case "Point":
+						return 	[pointStyleFunction(null,null,feature,resolution)];
+                    case "LineString":
+					case "MultiLineString":
+                        return 	[lineStyleFunction(null,null,feature,resolution)];
+                    case "Polygon":
+					case "MultiPolygon":
+                        return 	[polygonStyleFunction(null,null,feature,resolution)];
+                    }
+                }
+                return [new ol.style.Style({
+                    fill: new ol.style.Fill({
+                        color: 'rgba(255, 255, 255, 0.2)'
+                    }),
+                    stroke: new ol.style.Stroke({
+                        color: '#ffcc33',
+                        width: 3
+                    }),
+                    image: new ol.style.Circle({
+                        radius: 7,
+                        fill: new ol.style.Fill({
+                            color: '#ffcc33'
+                        })
+                    })
+                })];
+            }
     });
 
 
@@ -109,7 +173,8 @@
             }
             else {
                 
-            }
+            }//        
+
             if(active==true){
                 //$('.btn-edit-feature').css('background-color',app.controlButtonActiveBackground);
                 $modify.addClass(activeControlClass);
@@ -126,7 +191,27 @@
         init: function (map) {
             map.addInteraction(this.Point);
             this.Point.setActive(false);
+			this.setEvents();
         },
+		setEvents:function(){
+			this.Point.on('drawend',function(evt){
+				$('<div></div>').dialog({
+					modal: true,
+					title: "Set feature attribute",
+					open: function () {
+						var markup = 'name <input type="text" id="feat-name"/>';
+						$(this).html(markup);
+					},
+					buttons: {
+						Ok: function () {
+							var featName = $(this).find('#feat-name').val();
+							evt.feature.set('name',featName);
+							$(this).dialog("close");
+						}
+					}
+				}); 
+			})
+		},
         Point: new ol.interaction.Draw({
             source: vector.getSource(),
             type: /** @type {ol.geom.GeometryType} */('Point')
@@ -171,7 +256,22 @@
                 that.helpMsg = "Click to continue drawing or finish drawing by doubleclick";
             });
             this.LineString.on('drawend', function (evt) {
-                that.helpMsg = "Click to start drawing";
+				$('<div></div>').dialog({
+					modal: true,
+					title: "Set feature attribute",
+					open: function () {
+						var markup = 'name <input type="text" id="feat-name"/>';
+						$(this).html(markup);
+					},
+					buttons: {
+						Ok: function () {
+							var featName = $(this).find('#feat-name').val();
+							evt.feature.set('name',featName);
+							$(this).dialog("close");
+						}
+					}
+				});
+			   that.helpMsg = "Click to start drawing";
             });
         },
         setActive: function (active) {
@@ -210,7 +310,22 @@
                 that.helpMsg = "Click to continue drawing or finish drawing by doubleclick";
             });
             this.MultiPolygon.on('drawend', function (evt) {
-                that.helpMsg = "Click to start drawing";
+                $('<div></div>').dialog({
+					modal: true,
+					title: "Set feature attribute",
+					open: function () {
+						var markup = 'name <input type="text" id="feat-name"/>';
+						$(this).html(markup);
+					},
+					buttons: {
+						Ok: function () {
+							var featName = $(this).find('#feat-name').val();
+							evt.feature.set('name',featName);
+							$(this).dialog("close");
+						}
+					}
+				});
+				that.helpMsg = "Click to start drawing";
             });
         },
         setActive: function (active) {
@@ -269,17 +384,28 @@
     });
         
     var updateStyleFeature = function (fillColor,strokeColor) {
-        if (styleFeature) {
-            var defaultStyle = new ol.style.Style({
-                fill: new ol.style.Fill({
-                    color: fillColor ? fillColor : [250, 250, 250, 1]
-                }),
-                stroke: new ol.style.Stroke({
-                    color: strokeColor ? strokeColor : [220, 220, 220, 1],
-                    width: 1
-                })
-            });
-            styleFeature.setStyle(defaultStyle);
+         
+		if (styleFeature) {
+			var featStyle = styleFeature.getStyle();
+			if(featStyle){
+				styleFeature.getStyle().getFill().setColor(fillColor);
+				styleFeature.getStyle().getStroke().setColor(strokeColor);
+			}
+			else{
+				var featType = styleFeature.getGeometry().getType();               
+                
+                    switch (featType) {
+                    case "Point":
+						styleFeature.setStyle(pointStyleFunction(null,null,styleFeature,0));
+                    case "LineString":
+					case "MultiLineString":
+                        styleFeature.setStyle(lineStyleFunction(null,null,styleFeature,0));
+                    case "Polygon":
+					case "MultiPolygon":
+                        styleFeature.setStyle(polygonStyleFunction(null,null,styleFeature,0));
+                    }
+                
+			}
         }
     };
 

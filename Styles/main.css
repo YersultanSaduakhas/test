@@ -30,3 +30,7 @@ ol-control .active-control
 {
     visibility:hidden;
 }
+.ol-control .active-cntrol
+{
+    background-color:red;
+}
